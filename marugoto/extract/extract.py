@@ -13,6 +13,8 @@ from tqdm import tqdm
 import h5py
 
 from . import __version__
+from marugoto.extract.histaugan.model import HistAuGAN
+from marugoto.extract.histaugan.augment import augment
 
 
 __all__ = ['extract_features_']
@@ -47,7 +49,7 @@ def _get_coords(filename) -> Optional[np.ndarray]:
 
 def extract_features_(
         *,
-        model, model_name, slide_tile_paths: Sequence[Path], outdir: Path, augmented_repetitions: int = 0,
+        model, model_name, slide_tile_paths: Sequence[Path], outdir: Path, augmented_repetitions: int = 0, histaugan: bool = False,
 ) -> None:
     """Extracts features from slide tiles.
 
@@ -83,6 +85,15 @@ def extract_features_(
         json.dump({'extractor': extractor_string,
                   'augmented_repetitions': augmented_repetitions}, f)
 
+    # initialize HistAuGAN for augmentation
+    if histaugan:
+        print('Initializing HistAuGAN...')
+        histaugan_path = '/lustre/groups/haicu/workspace/sophia.wagner/HistAuGAN-7sites-epoch=10-l1_cc_loss=0.86.ckpt'
+        histaugan = HistAuGAN.load_from_checkpoint(histaugan_path)
+        del histaugan.dis1, histaugan.dis2, histaugan.dis_c, histaugan.enc_a
+        histaugan.to(torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
+        histaugan.eval()
+
     for slide_tile_path in tqdm(slide_tile_paths):
         slide_tile_path = Path(slide_tile_path)
         # check if h5 for slide already exists / slide_tile_path path contains tiles
@@ -94,26 +105,34 @@ def extract_features_(
             continue
 
         unaugmented_ds = SlideTileDataset(slide_tile_path, normal_transform)
-        augmented_ds = SlideTileDataset(slide_tile_path, augmenting_transform,
-                                        repetitions=augmented_repetitions)
-        ds = ConcatDataset([unaugmented_ds, augmented_ds])
+        # augmented_ds = SlideTileDataset(slide_tile_path, augmenting_transform,
+        #                                 repetitions=augmented_repetitions)
+        # ds = ConcatDataset([unaugmented_ds, augmented_ds]) # concatenates datasets to longer dataset
         dl = torch.utils.data.DataLoader(
-            ds, batch_size=64, shuffle=False, num_workers=os.cpu_count(), drop_last=False)
-
-        model = model.eval()
+            unaugmented_ds, batch_size=256, shuffle=False, num_workers=os.cpu_count(), drop_last=False)
 
         feats = []
+        if histaugan:
+            # add {num_domains} histaugan augmentations with fixed attribute per slide
+            feats_aug = []
+            z_attr = torch.randn((histaugan.opts.num_domains, histaugan.dim_attribute))
+
         for batch in tqdm(dl, leave=False):
-            feats.append(
-                model(batch.type_as(next(model.parameters()))).half().cpu().detach())
+            batch = batch.to(torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
+            feats.append(model(batch.type_as(next(model.parameters()))).half().cpu().detach())
+            if histaugan:
+                batch_aug = []
+                for d in range(histaugan.opts.num_domains):
+                    domain = torch.eye(histaugan.opts.num_domains)[d].unsqueeze(0)
+                    batch = augment(batch, histaugan, domain, z_attr[d].unsqueeze(0))
+                    batch_aug.append(model(batch.type_as(next(model.parameters()))).half().cpu().detach())
+                feats_aug.append(torch.stack(batch_aug))  # shape: (num_aug, bs, feature_dim)
 
         with h5py.File(h5outpath, 'w') as f:
-            f['coords'] = [_get_coords(
-                fn) for fn in unaugmented_ds.tiles] + [_get_coords(fn) for fn in augmented_ds.tiles]
+            f['coords'] = [_get_coords(fn) for fn in unaugmented_ds.tiles]
             f['feats'] = torch.concat(feats).cpu().numpy()
-            f['augmented'] = np.repeat(
-                [False, True], [len(unaugmented_ds), len(augmented_ds)])
-            assert len(f['feats']) == len(f['augmented'])
+            if histaugan:
+                f['feats_aug'] = torch.concat(feats_aug, dim=1).cpu().numpy()  # (num_aug, len_data, 2048)
             f.attrs['extractor'] = extractor_string
 
 
