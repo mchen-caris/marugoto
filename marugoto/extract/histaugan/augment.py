@@ -27,12 +27,12 @@ def augment(x: torch.Tensor, model: pl.LightningModule, domain: torch.Tensor, z_
 
     model.eval()
     with torch.no_grad():
-        # with torch.cuda.amp.autocast():  # to accelerate the forward pass through the GAN
-        # compute content encoding
-        z_content = model.enc_c(x)
+        with torch.cuda.amp.autocast():  # to accelerate the forward pass through the GAN
+            # compute content encoding
+            z_content = model.enc_c(x)
 
-        # generate augmentations
-        x = model.gen(z_content, z_attr, domain)  # in range [-1, 1]
+            # generate augmentations
+            x = model.gen(z_content, z_attr, domain)  # in range [-1, 1]
     x = F.interpolate(x, (w, h), mode='bilinear')  # otherwise, size 300 for input 299
 
     return x

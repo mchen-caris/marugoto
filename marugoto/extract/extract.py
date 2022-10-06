@@ -124,8 +124,9 @@ def extract_features_(
                 batch_aug = []
                 for d in range(histaugan.opts.num_domains):
                     domain = torch.eye(histaugan.opts.num_domains)[d].unsqueeze(0)
-                    batch = augment(batch, histaugan, domain, z_attr[d].unsqueeze(0))
-                    batch_aug.append(model(batch.type_as(next(model.parameters()))).half().cpu().detach())
+                    with torch.cuda.amp.autocast():  # to accelerate the forward pass through the feature extractor
+                        batch = augment(batch, histaugan, domain, z_attr[d].unsqueeze(0))
+                        batch_aug.append(model(batch.type_as(next(model.parameters()))).half().cpu().detach())
                 feats_aug.append(torch.stack(batch_aug))  # shape: (num_aug, bs, feature_dim)
 
         with h5py.File(h5outpath, 'w') as f:
