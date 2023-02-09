@@ -38,7 +38,7 @@ def train(
     targets: Tuple[SKLearnEncoder, npt.NDArray],
     add_features: Iterable[Tuple[SKLearnEncoder, npt.NDArray]] = [],
     valid_idxs: npt.NDArray[np.int_],
-    n_epoch: int = 32,
+    n_epoch: int = 50,
     path: Optional[Path] = None,
 ) -> Learner:
     """Train a MLP on image features.
@@ -54,7 +54,7 @@ def train(
         bags=bags[~valid_idxs],  # type: ignore  # arrays cannot be used a slices yet
         targets=(target_enc, targs[~valid_idxs]),
         add_features=[(enc, vals[~valid_idxs]) for enc, vals in add_features],
-        bag_size=512,
+        bag_size=32,
     )
 
     valid_ds = make_dataset(
@@ -63,14 +63,16 @@ def train(
         add_features=[(enc, vals[valid_idxs]) for enc, vals in add_features],
         bag_size=None,
     )
+    print(f"train_ds size: {len(train_ds)} valid_ds size: {len(valid_ds)}")
 
     # build dataloaders
     train_dl = DataLoader(
-        train_ds, batch_size=64, shuffle=True, num_workers=1, drop_last=True
+        train_ds, batch_size=32, shuffle=True, num_workers=1, drop_last=True
     )
     valid_dl = DataLoader(
         valid_ds, batch_size=1, shuffle=False, num_workers=os.cpu_count()
     )
+    print(f"train_dl size: {len(train_dl)} valid_dl size: {len(valid_dl)}")
     batch = train_dl.one_batch()
 
     model = MILModel(batch[0].shape[-1], batch[-1].shape[-1])

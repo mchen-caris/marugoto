@@ -55,7 +55,7 @@ class BagDataset(Dataset):
 
 
 def _to_fixed_size_bag(
-    bag: torch.Tensor, bag_size: int = 512
+    bag: torch.Tensor, bag_size: int = 32
 ) -> Tuple[torch.Tensor, int]:
     # get up to bag_size elements
     bag_idxs = torch.randperm(bag.shape[0])[:bag_size]

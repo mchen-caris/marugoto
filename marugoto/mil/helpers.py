@@ -317,8 +317,11 @@ def categorical_crossval_(
     categories = np.array(categories)
     info["categories"] = list(categories)
 
-    df = get_cohort_df(clini_table, slide_csv, feature_dir, target_label, categories)
-
+    df, categories = get_cohort_df(clini_table, slide_csv, feature_dir, target_label, categories)
+    print(df)
+    print(target_label)
+    print(categories)
+    #df.to_csv(output_path / "cohort.csv", index=False)
     info["class distribution"] = {
         "overall": {k: int(v) for k, v in df[target_label].value_counts().items()}
     }
