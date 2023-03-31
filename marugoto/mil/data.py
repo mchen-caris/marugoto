@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from collections.abc import Sequence
+from typing import Sequence
 from typing import Any, Iterable, Optional, Tuple
 from pathlib import Path
 

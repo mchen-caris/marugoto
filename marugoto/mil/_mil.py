@@ -2,7 +2,11 @@ from dataclasses import dataclass
 from typing import Any, Iterable, Optional, Sequence, Tuple, TypeVar
 from pathlib import Path
 import os
-
+#from .model import MILModel
+#from .bilstm import MILModel
+#from .timmViT import MILModel
+#from .vit_spatial import MILModel
+from .timmViT_improve import MILModel
 import torch
 import functools
 from torch import nn
@@ -30,7 +34,7 @@ def train(
         targets: Tuple[SKLearnEncoder, np.ndarray],
         add_features: Iterable[Tuple[SKLearnEncoder, Sequence[Any]]] = [],
         valid_idxs: np.ndarray,
-        n_epoch: int = 50,  # 8
+        n_epoch: int = 200,  # 8
         patience: int = 16,
         path: Optional[Path] = None,
 ) -> Learner:
@@ -67,7 +71,10 @@ def train(
     batch = train_dl.one_batch()
 
     # for binary classification num_classes=2 for same output dim as normal MILModel
-    model = ViT(num_classes=2)  # Transformer(num_classes=2)
+    #model = ViT(num_classes=2)  # Transformer(num_classes=2)
+    #model = MILModel(batch[0].shape[-1], batch[-1].shape[-1])
+    os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+    model = MILModel(n_classes=2)
     model.to(torch.device('cuda' if torch.cuda.is_available() else 'cpu'))  #
 
     # weigh inversely to class occurances
