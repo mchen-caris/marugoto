@@ -136,6 +136,7 @@ def train_categorical_model_(
     learn.cat_labels, learn.cont_labels = cat_labels, cont_labels
 
     learn.export()
+    learn.export(fname='export_copy.pkl')
 
     patient_preds, patient_targs = learn.get_preds(act=nn.Softmax(dim=1))
 

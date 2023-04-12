@@ -1,11 +1,12 @@
 #!/bin/bash
+set -eux
 for i in {1..5}; do
     timestamp=$(date +%Y%m%d-%H%M%S)
-    exp_name="timmVit_imrove_$timestamp"
+    exp_name="vit_lstm_feat_resnet50_nopretrain_$timestamp"
     clini_table="$HOME/dataset/duke_marugoto/clinical_table.csv"
     slide_csv="$HOME/dataset/duke_marugoto/slide_table.csv"
-    feature_dir="$HOME/dataset/duke_marugoto/merged/train_val/"
-    deploy_dir="$HOME/dataset/duke_marugoto/merged/test/"
+    feature_dir="$HOME/dataset/duke_marugoto/features_odelia_sub_resnet50_nopretrain/train_val"
+    deploy_dir="$HOME/dataset/duke_marugoto/features_odelia_sub_resnet50_nopretrain/test/"
     target_label="Malign"
     output_path="./results/$exp_name"
 
