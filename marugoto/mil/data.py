@@ -211,7 +211,7 @@ def get_cohort_df(
     h5s = set(feature_dir.glob("*.h5"))
     assert h5s, f"no features found in {feature_dir}!"
     h5_df = pd.DataFrame(h5s, columns=["slide_path"])
-    h5_df["FILENAME"] = h5_df.slide_path.map(lambda p: p.stem.split('.')[0])  # added .split('.')[0] for TCGA
+    h5_df["FILENAME"] = h5_df.slide_path.map(lambda p: p.stem)
     df = df.merge(h5_df, on="FILENAME")
     assert (
         not df.empty

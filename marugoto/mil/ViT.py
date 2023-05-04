@@ -56,13 +56,19 @@ class ViT(nn.Module):
         # )
 
         #self.pos_embedding = nn.Parameter(torch.randn(1, 18000, dim))
+        
+        self.input_dim = input_dim
+        
+        self.omega_x = nn.Parameter(torch.arange(input_dim // 4) / (input_dim // 4 - 1))
+        self.omega_y = nn.Parameter(torch.arange(input_dim // 4) / (input_dim // 4 - 1))
+        
         self.fc = nn.Sequential(nn.Linear(input_dim, 512, bias=True), nn.ReLU())  # added by me
 
         self.cls_token = nn.Parameter(torch.randn(1, 1, dim))
         self.dropout = nn.Dropout(emb_dropout)
 
         self.transformer = Transformer(dim, depth, heads, dim_head, mlp_dim, dropout)
-
+        
         self.pool = pool
         self.to_latent = nn.Identity()
 
@@ -70,11 +76,25 @@ class ViT(nn.Module):
             nn.LayerNorm(dim),
             nn.Linear(dim, num_classes)
         )
+    
+    def learnable_sincos_2d(self, x, coords, omega_x, omega_y, temperature = 10000, dtype = torch.float32):
+        b = x.shape[0]
+        #y, x = torch.meshgrid(torch.arange(h, device = device), torch.arange(w, device = device), indexing = 'ij')
+        y, x = coords[:,:,1], coords[:,:,0]
+        assert (self.input_dim % 4) == 0, 'feature dimension must be multiple of 4 for sincos emb'
+        #omega = torch.arange(dim // 4, device = device) / (dim // 4 - 1)
+        adj_omega_y = 1. / (temperature ** omega_y)
+        adj_omega_x = 1. / (temperature ** omega_x)   
+        y = y.view(b,-1)[:,:, None] * adj_omega_y[None, :]
+        x = x.view(b,-1)[:,:, None] * adj_omega_x[None, :] 
+        pe = torch.cat((x.sin(), x.cos(), y.sin(), y.cos()), dim = 2)
+        return pe.type(dtype)
 
     def forward(self, x, coords, register_hook=False):
         # x = self.to_patch_embedding(img)
         b, n, d = x.shape
-        pe = posemb_sincos_2d(x,coords)
+        #pe = posemb_sincos_2d(x,coords)
+        pe = self.learnable_sincos_2d(x,coords,self.omega_x,self.omega_y)
         x = x + pe
         x = self.fc(x)
         cls_tokens = repeat(self.cls_token, '1 1 d -> b 1 d', b=b)

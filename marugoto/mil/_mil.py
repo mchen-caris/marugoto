@@ -37,7 +37,7 @@ def train(
     targets: Tuple[SKLearnEncoder, npt.NDArray],
     add_features: Iterable[Tuple[SKLearnEncoder, npt.NDArray]] = [],
     valid_idxs: npt.NDArray[np.int_],
-    n_epoch: int = 32,
+    n_epoch: int = 35,
     path: Optional[Path] = None,
     num_feats: Optional[Path] = 768,
     gpu_id: Optional[Path] = 1,
