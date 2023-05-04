@@ -6,6 +6,19 @@ from torch import nn
 
 from .transformer import PreNorm, Attention, FeedForward
 
+# stolen from https://github.com/lucidrains/vit-pytorch/blob/main/vit_pytorch/simple_vit.py
+def posemb_sincos_2d(x, coords, temperature = 10000, dtype = torch.float32):
+    b,dim, device, dtype = x.shape[0],x.shape[-1], x.device, x.dtype
+    #y, x = torch.meshgrid(torch.arange(h, device = device), torch.arange(w, device = device), indexing = 'ij')
+    y, x = coords[:,:,1], coords[:,:,0]
+    assert (dim % 4) == 0, 'feature dimension must be multiple of 4 for sincos emb'
+    omega = torch.arange(dim // 4, device = device) / (dim // 4 - 1)
+    omega = 1. / (temperature ** omega)   
+    y = y.view(b,-1)[:,:, None] * omega[None, :]
+    x = x.view(b,-1)[:,:, None] * omega[None, :] 
+    pe = torch.cat((x.sin(), x.cos(), y.sin(), y.cos()), dim = 2)
+    return pe.type(dtype)
+
 
 class Transformer(nn.Module):
     def __init__(self, dim, depth, heads, dim_head, mlp_dim, dropout = 0.):
@@ -25,7 +38,7 @@ class Transformer(nn.Module):
 
 
 class ViT(nn.Module):
-    def __init__(self, *, num_classes, input_dim=2048, dim=512, depth=2, heads=8, mlp_dim=512, pool='cls', channels=3,
+    def __init__(self, *, num_classes, input_dim=768, dim=512, depth=2, heads=8, mlp_dim=512, pool='cls', channels=3,
                  dim_head=64, dropout=0., emb_dropout=0.):
         super().__init__()
         # image_height, image_width = pair(image_size)
@@ -42,7 +55,7 @@ class ViT(nn.Module):
         #     nn.Linear(patch_dim, dim),
         # )
 
-        # self.pos_embedding = nn.Parameter(torch.randn(1, num_patches + 1, dim))
+        #self.pos_embedding = nn.Parameter(torch.randn(1, 18000, dim))
         self.fc = nn.Sequential(nn.Linear(input_dim, 512, bias=True), nn.ReLU())  # added by me
 
         self.cls_token = nn.Parameter(torch.randn(1, 1, dim))
@@ -58,14 +71,15 @@ class ViT(nn.Module):
             nn.Linear(dim, num_classes)
         )
 
-    def forward(self, x, register_hook=False):
+    def forward(self, x, coords, register_hook=False):
         # x = self.to_patch_embedding(img)
         b, n, d = x.shape
-
+        pe = posemb_sincos_2d(x,coords)
+        x = x + pe
         x = self.fc(x)
         cls_tokens = repeat(self.cls_token, '1 1 d -> b 1 d', b=b)
         x = torch.cat((cls_tokens, x), dim=1)
-        # x += self.pos_embedding[:, :(n + 1)]
+        #x += self.pos_embedding[:, :(n + 1)]
         x = self.dropout(x)
 
         x = self.transformer(x) # , register_hook=register_hook
