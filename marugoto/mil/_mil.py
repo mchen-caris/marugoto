@@ -56,22 +56,22 @@ def train(
         bags=bags[~valid_idxs],  # type: ignore  # arrays cannot be used a slices yet
         targets=(target_enc, targs[~valid_idxs]),
         add_features=[(enc, vals[~valid_idxs]) for enc, vals in add_features],
-        bag_size=512,
+        bag_size=4096,
     )
 
     valid_ds = make_dataset(
         bags=bags[valid_idxs],  # type: ignore  # arrays cannot be used a slices yet
         targets=(target_enc, targs[valid_idxs]),
         add_features=[(enc, vals[valid_idxs]) for enc, vals in add_features],
-        bag_size=None,
+        bag_size=4096,
     )
 
     # build dataloaders
     train_dl = DataLoader(
-        train_ds, batch_size=64, shuffle=True, num_workers=1, drop_last=True
+        train_ds, batch_size=8, shuffle=True, num_workers=16, drop_last=True
     )
     valid_dl = DataLoader(
-        valid_ds, batch_size=1, shuffle=False, num_workers=os.cpu_count()
+        valid_ds, batch_size=1, shuffle=False, num_workers=16,
     )
     batch = valid_dl.one_batch()
     nr_classes = batch[-1].shape[-1]
@@ -102,11 +102,12 @@ def train(
                     metrics=[RocAuc()], path=path)
 
     cbs = [
-        SaveModelCallback(fname=f"best_valid"),
+        SaveModelCallback(monitor="roc_auc_score",fname=f"best_valid"),
         CSVLogger(),
     ]
 
     learn.fit_one_cycle(n_epoch=n_epoch, lr_max=1e-4, cbs=cbs)
+
 
     return learn
 
@@ -141,11 +142,11 @@ def deploy(
         bags=test_df.slide_path.values,
         targets=(target_enc, test_df[target_label].values),
         add_features=add_features,
-        bag_size=None,
+        bag_size=4096,
     )
 
     test_dl = DataLoader(
-        test_ds, batch_size=1, shuffle=False, num_workers=os.cpu_count()
+        test_ds, batch_size=1, shuffle=False, num_workers=16
     )
 
     # removed softmax in forward, but add here to get 0-1 probabilities

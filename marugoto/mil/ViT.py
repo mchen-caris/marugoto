@@ -59,10 +59,12 @@ class ViT(nn.Module):
         
         self.input_dim = input_dim
         
-        self.omega_x = nn.Parameter(torch.arange(input_dim // 4) / (input_dim // 4 - 1))
-        self.omega_y = nn.Parameter(torch.arange(input_dim // 4) / (input_dim // 4 - 1))
+        self.omega_x = nn.Parameter(torch.arange(dim // 4) / (dim // 4 - 1))
+        self.omega_y = nn.Parameter(torch.arange(dim // 4) / (dim // 4 - 1))
         
-        self.fc = nn.Sequential(nn.Linear(input_dim, 512, bias=True), nn.ReLU())  # added by me
+        #self.scale = nn.Parameter(torch.randn(dim))
+        
+        self.fc = nn.Sequential(nn.Linear(input_dim, dim, bias=True), nn.ReLU())  # added by me
 
         self.cls_token = nn.Parameter(torch.randn(1, 1, dim))
         self.dropout = nn.Dropout(emb_dropout)
@@ -93,10 +95,13 @@ class ViT(nn.Module):
     def forward(self, x, coords, register_hook=False):
         # x = self.to_patch_embedding(img)
         b, n, d = x.shape
+        #print(f"input shape: {x.shape}")
         #pe = posemb_sincos_2d(x,coords)
+        #pe = self.learnable_sincos_2d(x,coords,self.omega_x,self.omega_y)
+        #x = x + pe
+        x = self.fc(x)
         pe = self.learnable_sincos_2d(x,coords,self.omega_x,self.omega_y)
         x = x + pe
-        x = self.fc(x)
         cls_tokens = repeat(self.cls_token, '1 1 d -> b 1 d', b=b)
         x = torch.cat((cls_tokens, x), dim=1)
         #x += self.pos_embedding[:, :(n + 1)]
