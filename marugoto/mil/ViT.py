@@ -39,7 +39,7 @@ class Transformer(nn.Module):
 
 class ViT(nn.Module):
     def __init__(self, *, num_classes, input_dim=768, dim=512, depth=2, heads=8, mlp_dim=512, pool='cls', channels=3,
-                 dim_head=64, dropout=0., emb_dropout=0.):
+                 dim_head=64, dropout=0., emb_dropout=0.,nr_tiles=2048):
         super().__init__()
         # image_height, image_width = pair(image_size)
         # patch_height, patch_width = pair(patch_size)
@@ -55,14 +55,14 @@ class ViT(nn.Module):
         #     nn.Linear(patch_dim, dim),
         # )
 
-        #self.pos_embedding = nn.Parameter(torch.randn(1, 18000, dim))
+        self.pos_embedding = nn.Parameter(torch.randn(1, nr_tiles+1, dim))
         
         self.input_dim = input_dim
         
         self.omega_x = nn.Parameter(torch.arange(dim // 4) / (dim // 4 - 1))
         self.omega_y = nn.Parameter(torch.arange(dim // 4) / (dim // 4 - 1))
         
-        #self.scale = nn.Parameter(torch.randn(dim))
+        self.scale = nn.Parameter(torch.randn(dim))
         
         self.fc = nn.Sequential(nn.Linear(input_dim, dim, bias=True), nn.ReLU())  # added by me
 
@@ -100,11 +100,16 @@ class ViT(nn.Module):
         #pe = self.learnable_sincos_2d(x,coords,self.omega_x,self.omega_y)
         #x = x + pe
         x = self.fc(x)
-        pe = self.learnable_sincos_2d(x,coords,self.omega_x,self.omega_y)
-        x = x + pe
+        #pe = self.learnable_sincos_2d(x,coords,self.omega_x,self.omega_y)
+        #pe = posemb_sincos_2d(x,coords)
+        #x = x + pe*self.scale
+        #pe = self.learnable_sincos_2d(x,coords,self.omega_x,self.omega_y)
+        #x = x + pe*self.scale[:n]
+        
         cls_tokens = repeat(self.cls_token, '1 1 d -> b 1 d', b=b)
         x = torch.cat((cls_tokens, x), dim=1)
-        #x += self.pos_embedding[:, :(n + 1)]
+        #pe = self.learnable_sincos_2d(x,coords,self.omega_x,self.omega_y)
+        #x = x + self.pos_embedding[:, :(n + 1)]
         x = self.dropout(x)
 
         x = self.transformer(x) # , register_hook=register_hook

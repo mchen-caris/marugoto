@@ -8,6 +8,7 @@ from fastai.vision.all import (
     DataLoader,
     DataLoaders,
     RocAuc,
+    F1Score,
     SaveModelCallback,
     CSVLogger,
 )
@@ -37,10 +38,12 @@ def train(
     targets: Tuple[SKLearnEncoder, npt.NDArray],
     add_features: Iterable[Tuple[SKLearnEncoder, npt.NDArray]] = [],
     valid_idxs: npt.NDArray[np.int_],
-    n_epoch: int = 35,
+    n_epoch: int = 45,
     path: Optional[Path] = None,
     num_feats: Optional[Path] = 768,
     gpu_id: Optional[Path] = 1,
+    batch_size: Optional[int] = 8,
+    bag_size: Optional[int] = 4096,
 ) -> Learner:
     """Train a MLP on image features.
 
@@ -56,22 +59,22 @@ def train(
         bags=bags[~valid_idxs],  # type: ignore  # arrays cannot be used a slices yet
         targets=(target_enc, targs[~valid_idxs]),
         add_features=[(enc, vals[~valid_idxs]) for enc, vals in add_features],
-        bag_size=4096,
+        bag_size=bag_size,
     )
 
     valid_ds = make_dataset(
         bags=bags[valid_idxs],  # type: ignore  # arrays cannot be used a slices yet
         targets=(target_enc, targs[valid_idxs]),
         add_features=[(enc, vals[valid_idxs]) for enc, vals in add_features],
-        bag_size=4096,
+        bag_size=bag_size,
     )
 
     # build dataloaders
     train_dl = DataLoader(
-        train_ds, batch_size=8, shuffle=True, num_workers=16, drop_last=True
+        train_ds, batch_size=batch_size, shuffle=True, num_workers=24, drop_last=True
     )
     valid_dl = DataLoader(
-        valid_ds, batch_size=1, shuffle=False, num_workers=16,
+        valid_ds, batch_size=batch_size, shuffle=False, num_workers=24,
     )
     batch = valid_dl.one_batch()
     nr_classes = batch[-1].shape[-1]
@@ -83,7 +86,7 @@ def train(
     # print(f"batch[2] {batch[2]}")
     # print(f"batch[3]: {batch[3]}")
     # for binary classification num_classes=2 for same output dim as normal MILModel
-    model = ViT(num_classes=nr_classes,input_dim=num_feats) # Transformer(num_classes=2)
+    model = ViT(num_classes=nr_classes,input_dim=num_feats,nr_tiles=bag_size) # Transformer(num_classes=2)
     print(f"num_feats: {num_feats}")
     model.to(torch.device(dev if torch.cuda.is_available() else 'cpu')) #
 
@@ -99,10 +102,11 @@ def train(
 
     dls = DataLoaders(train_dl, valid_dl, device=torch.device(dev if torch.cuda.is_available() else 'cpu')) #
     learn = Learner(dls, model, loss_func=loss_func,
-                    metrics=[RocAuc()], path=path)
+                    metrics=[RocAuc(),F1Score()], path=path)
 
     cbs = [
-        SaveModelCallback(monitor="roc_auc_score",fname=f"best_valid"),
+        #SaveModelCallback(monitor="roc_auc_score",fname=f"best_valid"),
+        SaveModelCallback(fname=f"best_valid"),
         CSVLogger(),
     ]
 
@@ -119,6 +123,8 @@ def deploy(
     target_label: Optional[str] = None,
     cat_labels: Optional[Sequence[str]] = None,
     cont_labels: Optional[Sequence[str]] = None,
+    batch_size: Optional[int] = 8,
+    bag_size: Optional[int] = 4096,
 ) -> pd.DataFrame:
     assert test_df.PATIENT.nunique() == len(test_df), "duplicate patients!"
     if target_label is None:
@@ -142,11 +148,11 @@ def deploy(
         bags=test_df.slide_path.values,
         targets=(target_enc, test_df[target_label].values),
         add_features=add_features,
-        bag_size=4096,
+        bag_size=bag_size,
     )
 
     test_dl = DataLoader(
-        test_ds, batch_size=1, shuffle=False, num_workers=16
+        test_ds, batch_size=batch_size, shuffle=False, num_workers=24
     )
 
     # removed softmax in forward, but add here to get 0-1 probabilities

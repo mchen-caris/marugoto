@@ -42,6 +42,7 @@ def train_categorical_model_(
     categories: Optional[npt.NDArray] = None,
     num_feats: Optional[int] = 768,
     gpu_id: Optional[int] = 0,
+    seed: Optional[int] = 12345,
 ) -> None:
     """Train a categorical model on a cohort's tile's features.
 
@@ -96,7 +97,7 @@ def train_categorical_model_(
 
     # Split off validation set
     train_patients, valid_patients = train_test_split(
-        df.PATIENT, stratify=df[target_label]
+        df.PATIENT, stratify=df[target_label], seed = seed,
     )
     train_df = df[df.PATIENT.isin(train_patients)]
     valid_df = df[df.PATIENT.isin(valid_patients)]

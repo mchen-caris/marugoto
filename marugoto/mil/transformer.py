@@ -18,7 +18,7 @@ class PreNorm(nn.Module):
 
 
 class Attention(nn.Module):
-    def __init__(self, dim=512, heads=8, dim_head=512 // 8, dropout=0.1,fmap_size=64):
+    def __init__(self, dim=512, heads=8, dim_head=512 // 8, dropout=0.1,fmap_size=32):
         super().__init__()
         inner_dim = dim_head * heads
         project_out = not (heads == 1 and dim_head == dim)
@@ -65,7 +65,7 @@ class Attention(nn.Module):
 
         dots = torch.matmul(q, k.transpose(-1, -2)) * self.scale
 
-        dots = self.apply_pos_bias(dots)
+        #dots = self.apply_pos_bias(dots)
         
         attn = self.attend(dots)
 

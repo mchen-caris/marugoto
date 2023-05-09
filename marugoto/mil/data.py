@@ -60,7 +60,7 @@ def _to_fixed_size_bag(
     bag: torch.Tensor, coords: torch.Tensor, bag_size: int = 512
 ) -> Tuple[torch.Tensor, torch.Tensor, int]:
     # get up to bag_size elements
-    bag_idxs = torch.randperm(bag.shape[0])[:bag_size]
+    bag_idxs = torch.sort(torch.randperm(bag.shape[0])[:bag_size])[0]
     bag_samples = bag[bag_idxs]
     coord_samples = coords[bag_idxs]
 
