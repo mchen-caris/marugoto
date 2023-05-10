@@ -21,6 +21,8 @@ import pandas as pd
 
 from marugoto.data import SKLearnEncoder
 
+import matplotlib.pyplot as plt
+
 from .data import make_dataset
 from .transformer import Transformer
 from .ViT import ViT
@@ -38,7 +40,7 @@ def train(
     targets: Tuple[SKLearnEncoder, npt.NDArray],
     add_features: Iterable[Tuple[SKLearnEncoder, npt.NDArray]] = [],
     valid_idxs: npt.NDArray[np.int_],
-    n_epoch: int = 45,
+    n_epoch: int = 35,
     path: Optional[Path] = None,
     num_feats: Optional[Path] = 768,
     gpu_id: Optional[Path] = 1,
@@ -102,7 +104,7 @@ def train(
 
     dls = DataLoaders(train_dl, valid_dl, device=torch.device(dev if torch.cuda.is_available() else 'cpu')) #
     learn = Learner(dls, model, loss_func=loss_func,
-                    metrics=[RocAuc(),F1Score()], path=path)
+                    metrics=[RocAuc()], path=path) #,F1Score()
 
     cbs = [
         #SaveModelCallback(monitor="roc_auc_score",fname=f"best_valid"),
@@ -112,7 +114,14 @@ def train(
 
     learn.fit_one_cycle(n_epoch=n_epoch, lr_max=1e-4, cbs=cbs)
 
-
+    #pos_feat_imp = nn.functional.softmax(learn.fc[0].weight,dim=1)[:,-2:]
+    #print(f"pos feature weights: {pos_feat_imp}")
+    feat_importances = torch.abs(learn.fc[0].weight).sum(dim=0).cpu().detach().numpy()
+    plt.bar(range(770),feat_importances)
+    plt.xlabel("Feature index")
+    plt.ylabel("Importance")
+    plt.savefig(f"feat_importance_{np.random.randint(2000)}.pdf",dpi=250)
+    
     return learn
 
 

@@ -39,7 +39,7 @@ class Transformer(nn.Module):
 
 class ViT(nn.Module):
     def __init__(self, *, num_classes, input_dim=768, dim=512, depth=2, heads=8, mlp_dim=512, pool='cls', channels=3,
-                 dim_head=64, dropout=0., emb_dropout=0.,nr_tiles=2048):
+                 dim_head=64, dropout=0., emb_dropout=0., nr_tiles=4096, add_pos_feats=True):
         super().__init__()
         # image_height, image_width = pair(image_size)
         # patch_height, patch_width = pair(patch_size)
@@ -64,12 +64,16 @@ class ViT(nn.Module):
         
         self.scale = nn.Parameter(torch.randn(dim))
         
-        self.fc = nn.Sequential(nn.Linear(input_dim, dim, bias=True), nn.ReLU())  # added by me
+        if(add_pos_feats):
+            self.input_dim=self.input_dim + 2     
+        self.fc = nn.Sequential(nn.Linear(self.input_dim, dim, bias=True), nn.ReLU())  # added by me
 
+        #self.cls_token = nn.Parameter(torch.randn(1, 1, dim))
         self.cls_token = nn.Parameter(torch.randn(1, 1, dim))
         self.dropout = nn.Dropout(emb_dropout)
 
         self.transformer = Transformer(dim, depth, heads, dim_head, mlp_dim, dropout)
+        #self.transformer = Transformer(self.input_dim, depth, heads, dim_head, mlp_dim, dropout)
         
         self.pool = pool
         self.to_latent = nn.Identity()
@@ -78,6 +82,10 @@ class ViT(nn.Module):
             nn.LayerNorm(dim),
             nn.Linear(dim, num_classes)
         )
+        # self.mlp_head = nn.Sequential(
+        #     nn.LayerNorm(self.input_dim),
+        #     nn.Linear(self.input_dim, num_classes)
+        # )
     
     def learnable_sincos_2d(self, x, coords, omega_x, omega_y, temperature = 10000, dtype = torch.float32):
         b = x.shape[0]
@@ -99,6 +107,7 @@ class ViT(nn.Module):
         #pe = posemb_sincos_2d(x,coords)
         #pe = self.learnable_sincos_2d(x,coords,self.omega_x,self.omega_y)
         #x = x + pe
+        x = torch.cat((x,coords/15e+4),dim=2)
         x = self.fc(x)
         #pe = self.learnable_sincos_2d(x,coords,self.omega_x,self.omega_y)
         #pe = posemb_sincos_2d(x,coords)
