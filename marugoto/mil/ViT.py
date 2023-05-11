@@ -16,7 +16,7 @@ def posemb_sincos_2d(x, coords, temperature = 10000, dtype = torch.float32):
     omega = 1. / (temperature ** omega)   
     y = y.view(b,-1)[:,:, None] * omega[None, :]
     x = x.view(b,-1)[:,:, None] * omega[None, :] 
-    pe = torch.cat((x.sin(), x.cos(), y.sin(), y.cos()), dim = 2)
+    pe = torch.cat((x.sin(), x.cos(), y.sin(), y.cos()), dim = 2)/5
     return pe.type(dtype)
 
 
@@ -97,7 +97,7 @@ class ViT(nn.Module):
         adj_omega_x = 1. / (temperature ** omega_x)   
         y = y.view(b,-1)[:,:, None] * adj_omega_y[None, :]
         x = x.view(b,-1)[:,:, None] * adj_omega_x[None, :] 
-        pe = torch.cat((x.sin(), x.cos(), y.sin(), y.cos()), dim = 2)
+        pe = torch.cat((x.sin(), x.cos(), y.sin(), y.cos()), dim = 2)/5
         return pe.type(dtype)
 
     def forward(self, x, coords, register_hook=False):
@@ -107,17 +107,19 @@ class ViT(nn.Module):
         #pe = posemb_sincos_2d(x,coords)
         #pe = self.learnable_sincos_2d(x,coords,self.omega_x,self.omega_y)
         #x = x + pe
-        x = torch.cat((x,coords/15e+4),dim=2)
+        pe = posemb_sincos_2d(x,coords)
+        x = x + pe
+        x = torch.cat((x,coords/1.5e+5),dim=2)
         x = self.fc(x)
         #pe = self.learnable_sincos_2d(x,coords,self.omega_x,self.omega_y)
-        #pe = posemb_sincos_2d(x,coords)
-        #x = x + pe*self.scale
+        
         #pe = self.learnable_sincos_2d(x,coords,self.omega_x,self.omega_y)
         #x = x + pe*self.scale[:n]
         
         cls_tokens = repeat(self.cls_token, '1 1 d -> b 1 d', b=b)
         x = torch.cat((cls_tokens, x), dim=1)
         #pe = self.learnable_sincos_2d(x,coords,self.omega_x,self.omega_y)
+        
         #x = x + self.pos_embedding[:, :(n + 1)]
         x = self.dropout(x)
 

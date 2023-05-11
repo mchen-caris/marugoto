@@ -40,7 +40,7 @@ def train(
     targets: Tuple[SKLearnEncoder, npt.NDArray],
     add_features: Iterable[Tuple[SKLearnEncoder, npt.NDArray]] = [],
     valid_idxs: npt.NDArray[np.int_],
-    n_epoch: int = 35,
+    n_epoch: int = 15,
     path: Optional[Path] = None,
     num_feats: Optional[Path] = 768,
     gpu_id: Optional[Path] = 1,
@@ -117,10 +117,12 @@ def train(
     #pos_feat_imp = nn.functional.softmax(learn.fc[0].weight,dim=1)[:,-2:]
     #print(f"pos feature weights: {pos_feat_imp}")
     feat_importances = torch.abs(learn.fc[0].weight).sum(dim=0).cpu().detach().numpy()
-    plt.bar(range(770),feat_importances)
-    plt.xlabel("Feature index")
-    plt.ylabel("Importance")
-    plt.savefig(f"feat_importance_{np.random.randint(2000)}.pdf",dpi=250)
+    pos_feat_importances = feat_importances[-2:]/np.sum(feat_importances)*len(feat_importances)
+    print(f"pos feat importances: {pos_feat_importances}")
+    #plt.bar(range(770),feat_importances)
+    #plt.xlabel("Feature index")
+    #plt.ylabel("Importance")
+    #plt.savefig(f"feat_importance_{np.random.randint(2000)}.pdf",dpi=250)
     
     return learn
 
