@@ -16,7 +16,7 @@ def posemb_sincos_2d(x, coords, temperature = 10000, dtype = torch.float32):
     omega = 1. / (temperature ** omega)   
     y = y.view(b,-1)[:,:, None] * omega[None, :]
     x = x.view(b,-1)[:,:, None] * omega[None, :] 
-    pe = torch.cat((x.sin(), x.cos(), y.sin(), y.cos()), dim = 2)/5
+    pe = torch.cat((x.sin(), x.cos(), y.sin(), y.cos()), dim = 2)/10
     return pe.type(dtype)
 
 
@@ -39,7 +39,7 @@ class Transformer(nn.Module):
 
 class ViT(nn.Module):
     def __init__(self, *, num_classes, input_dim=768, dim=512, depth=2, heads=8, mlp_dim=512, pool='cls', channels=3,
-                 dim_head=64, dropout=0., emb_dropout=0., nr_tiles=4096, add_pos_feats=True):
+                 dim_head=64, dropout=0., emb_dropout=0., nr_tiles=4096, add_pos_feats=False):
         super().__init__()
         # image_height, image_width = pair(image_size)
         # patch_height, patch_width = pair(patch_size)
@@ -97,7 +97,7 @@ class ViT(nn.Module):
         adj_omega_x = 1. / (temperature ** omega_x)   
         y = y.view(b,-1)[:,:, None] * adj_omega_y[None, :]
         x = x.view(b,-1)[:,:, None] * adj_omega_x[None, :] 
-        pe = torch.cat((x.sin(), x.cos(), y.sin(), y.cos()), dim = 2)/5
+        pe = torch.cat((x.sin(), x.cos(), y.sin(), y.cos()), dim = 2)/10
         return pe.type(dtype)
 
     def forward(self, x, coords, register_hook=False):
@@ -107,9 +107,9 @@ class ViT(nn.Module):
         #pe = posemb_sincos_2d(x,coords)
         #pe = self.learnable_sincos_2d(x,coords,self.omega_x,self.omega_y)
         #x = x + pe
-        pe = posemb_sincos_2d(x,coords)
-        x = x + pe
-        x = torch.cat((x,coords/1.5e+5),dim=2)
+        #pe = posemb_sincos_2d(x,coords)
+        #x = x + pe
+        #x = torch.cat((x,coords/3e+4),dim=2)
         x = self.fc(x)
         #pe = self.learnable_sincos_2d(x,coords,self.omega_x,self.omega_y)
         

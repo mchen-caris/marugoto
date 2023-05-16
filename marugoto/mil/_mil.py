@@ -40,12 +40,12 @@ def train(
     targets: Tuple[SKLearnEncoder, npt.NDArray],
     add_features: Iterable[Tuple[SKLearnEncoder, npt.NDArray]] = [],
     valid_idxs: npt.NDArray[np.int_],
-    n_epoch: int = 15,
+    n_epoch: int = 32,
     path: Optional[Path] = None,
     num_feats: Optional[Path] = 768,
     gpu_id: Optional[Path] = 1,
-    batch_size: Optional[int] = 8,
-    bag_size: Optional[int] = 4096,
+    batch_size: Optional[int] = 64,
+    bag_size: Optional[int] = 1024,
 ) -> Learner:
     """Train a MLP on image features.
 
@@ -68,7 +68,8 @@ def train(
         bags=bags[valid_idxs],  # type: ignore  # arrays cannot be used a slices yet
         targets=(target_enc, targs[valid_idxs]),
         add_features=[(enc, vals[valid_idxs]) for enc, vals in add_features],
-        bag_size=bag_size,
+        #bag_size=bag_size,
+        bag_size=None
     )
 
     # build dataloaders
@@ -76,7 +77,8 @@ def train(
         train_ds, batch_size=batch_size, shuffle=True, num_workers=24, drop_last=True
     )
     valid_dl = DataLoader(
-        valid_ds, batch_size=batch_size, shuffle=False, num_workers=24,
+        #valid_ds, batch_size=batch_size, shuffle=False, num_workers=24,
+        valid_ds, batch_size=1, shuffle=False, num_workers=24,
     )
     batch = valid_dl.one_batch()
     nr_classes = batch[-1].shape[-1]
@@ -134,8 +136,8 @@ def deploy(
     target_label: Optional[str] = None,
     cat_labels: Optional[Sequence[str]] = None,
     cont_labels: Optional[Sequence[str]] = None,
-    batch_size: Optional[int] = 8,
-    bag_size: Optional[int] = 4096,
+    batch_size: Optional[int] = 1,
+    bag_size: Optional[int] = None,
 ) -> pd.DataFrame:
     assert test_df.PATIENT.nunique() == len(test_df), "duplicate patients!"
     if target_label is None:
