@@ -18,8 +18,11 @@ class PreNorm(nn.Module):
 
 
 class Attention(nn.Module):
-    def __init__(self, dim=512, heads=8, dim_head=512 // 8, dropout=0.1,fmap_size=32):
+    def __init__(self, dim=512, heads=8, dim_head=512 // 8, dropout=0.1,fmap_size=32, pos_enc=""):
         super().__init__()
+        
+        self.pos_enc = pos_enc
+        
         inner_dim = dim_head * heads
         project_out = not (heads == 1 and dim_head == dim)
 
@@ -34,25 +37,27 @@ class Attention(nn.Module):
             nn.Dropout(dropout)
         ) if project_out else nn.Identity()
         
-        # pos bias (adapted from: https://github.com/lucidrains/vit-pytorch/blob/main/vit_pytorch/levit.py)
+        if "rel" in self.pos_enc:
         
-        self.pos_bias = nn.Embedding(fmap_size * fmap_size+1, heads)
+            # pos bias (adapted from: https://github.com/lucidrains/vit-pytorch/blob/main/vit_pytorch/levit.py)
 
-        q_range = torch.arange(fmap_size)
-        k_range = torch.arange(fmap_size)
+            self.pos_bias = nn.Embedding(fmap_size * fmap_size+1, heads)
 
-        q_pos = torch.stack(torch.meshgrid(q_range, q_range, indexing = 'ij'), dim = -1)
-        k_pos = torch.stack(torch.meshgrid(k_range, k_range, indexing = 'ij'), dim = -1)
+            q_range = torch.arange(fmap_size)
+            k_range = torch.arange(fmap_size)
 
-        q_pos, k_pos = map(lambda t: rearrange(t, 'i j c -> (i j) c'), (q_pos, k_pos))
-        q_pos = torch.cat((q_pos,torch.zeros(1,2,dtype=int)))
-        k_pos = torch.cat((k_pos,torch.zeros(1,2,dtype=int)))
-        rel_pos = (q_pos[:, None, ...] - k_pos[None, :, ...]).abs()
+            q_pos = torch.stack(torch.meshgrid(q_range, q_range, indexing = 'ij'), dim = -1)
+            k_pos = torch.stack(torch.meshgrid(k_range, k_range, indexing = 'ij'), dim = -1)
 
-        x_rel, y_rel = rel_pos.unbind(dim = -1)
-        pos_indices = (x_rel * fmap_size) + y_rel
+            q_pos, k_pos = map(lambda t: rearrange(t, 'i j c -> (i j) c'), (q_pos, k_pos))
+            q_pos = torch.cat((q_pos,torch.zeros(1,2,dtype=int)))
+            k_pos = torch.cat((k_pos,torch.zeros(1,2,dtype=int)))
+            rel_pos = (q_pos[:, None, ...] - k_pos[None, :, ...]).abs()
 
-        self.register_buffer('pos_indices', pos_indices)
+            x_rel, y_rel = rel_pos.unbind(dim = -1)
+            pos_indices = (x_rel * fmap_size) + y_rel
+
+            self.register_buffer('pos_indices', pos_indices)
 
     def apply_pos_bias(self, fmap):
         bias = self.pos_bias(self.pos_indices)
@@ -65,7 +70,8 @@ class Attention(nn.Module):
 
         dots = torch.matmul(q, k.transpose(-1, -2)) * self.scale
 
-        #dots = self.apply_pos_bias(dots)
+        if "rel" in self.pos_enc:
+            dots = self.apply_pos_bias(dots)
         
         attn = self.attend(dots)
 

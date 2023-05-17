@@ -43,6 +43,8 @@ def train_categorical_model_(
     num_feats: Optional[int] = 768,
     gpu_id: Optional[int] = 0,
     seed: Optional[int] = 12345,
+    pos_enc: Optional[str] = None,
+    bs_tr_only: Optional[bool] = False,
 ) -> None:
     """Train a categorical model on a cohort's tile's features.
 
@@ -134,6 +136,8 @@ def train_categorical_model_(
         path=output_path,
         num_feats=num_feats,
         gpu_id=gpu_id,
+        pos_enc=pos_enc,
+        bs_tr_only=bs_tr_only
     )
 
     # save some additional information to the learner to make deployment easier
@@ -220,6 +224,7 @@ def deploy_categorical_model_(
     target_label: Optional[str] = None,
     cat_labels: Optional[str] = None,
     cont_labels: Optional[str] = None,
+    bs_tr_only: Optional[bool] = False,
 ) -> None:
     """Deploy a categorical model on a cohort's tile's features.
 
@@ -259,7 +264,7 @@ def deploy_categorical_model_(
     test_df, _ = get_cohort_df(
         clini_table, slide_csv, feature_dir, target_label, categories
     )
-    patient_preds_df = deploy(test_df=test_df, learn=learn, target_label=target_label)
+    patient_preds_df = deploy(test_df=test_df, learn=learn, target_label=target_label,bs_tr_only=bs_tr_only)
     output_path.mkdir(parents=True, exist_ok=True)
     patient_preds_df.to_csv(preds_csv, index=False)
 
@@ -279,6 +284,8 @@ def categorical_crossval_(
     categories: Optional[Iterable[str]] = None,
     num_feats: Optional[int] = 768,
     gpu_id: Optional[int] = 0,
+    pos_enc: Optional[str] = None,
+    bs_tr_only: Optional[bool] = False,
 ) -> None:
     """Performs a cross-validation for a categorical target.
 
@@ -393,7 +400,9 @@ def categorical_crossval_(
                 cat_labels=cat_labels,
                 cont_labels=cont_labels,
                 num_feats = num_feats,
-                gpu_id=gpu_id
+                gpu_id=gpu_id,
+                pos_enc = pos_enc,
+                bs_tr_only=bs_tr_only
             )
             learn.export()
 
@@ -413,6 +422,7 @@ def categorical_crossval_(
 
 def _crossval_train(
     *, fold_path, fold_df, fold, info, target_label, target_enc, cat_labels, cont_labels, num_feats=768, gpu_id=0,
+    pos_enc = None, bs_tr_only=False,
 ):
     """Helper function for training the folds."""
     assert fold_df.PATIENT.nunique() == len(fold_df)
@@ -455,6 +465,8 @@ def _crossval_train(
         path=fold_path,
         num_feats = num_feats,
         gpu_id=gpu_id,
+        pos_enc = pos_enc,
+        bs_tr_only=bs_tr_only,
     )
     learn.target_label = target_label
     learn.cat_labels, learn.cont_labels = cat_labels, cont_labels

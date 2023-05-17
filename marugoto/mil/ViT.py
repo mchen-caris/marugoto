@@ -16,17 +16,17 @@ def posemb_sincos_2d(x, coords, temperature = 10000, dtype = torch.float32):
     omega = 1. / (temperature ** omega)   
     y = y.view(b,-1)[:,:, None] * omega[None, :]
     x = x.view(b,-1)[:,:, None] * omega[None, :] 
-    pe = torch.cat((x.sin(), x.cos(), y.sin(), y.cos()), dim = 2)/10
+    pe = torch.cat((x.sin(), x.cos(), y.sin(), y.cos()), dim = 2)/5
     return pe.type(dtype)
 
 
 class Transformer(nn.Module):
-    def __init__(self, dim, depth, heads, dim_head, mlp_dim, dropout = 0.):
+    def __init__(self, dim, depth, heads, dim_head, mlp_dim, dropout = 0., pos_enc=""):
         super().__init__()
         self.layers = nn.ModuleList([])
         for _ in range(depth):
             self.layers.append(nn.ModuleList([
-                PreNorm(dim, Attention(dim, heads = heads, dim_head = dim_head, dropout = dropout)),
+                PreNorm(dim, Attention(dim, heads = heads, dim_head = dim_head, dropout = dropout, pos_enc=pos_enc)),
                 PreNorm(dim, FeedForward(dim, mlp_dim, dropout = dropout))
             ]))
 
@@ -39,7 +39,7 @@ class Transformer(nn.Module):
 
 class ViT(nn.Module):
     def __init__(self, *, num_classes, input_dim=768, dim=512, depth=2, heads=8, mlp_dim=512, pool='cls', channels=3,
-                 dim_head=64, dropout=0., emb_dropout=0., nr_tiles=4096, add_pos_feats=False):
+                 dim_head=64, dropout=0., emb_dropout=0., nr_tiles=4096, pos_enc=None):
         super().__init__()
         # image_height, image_width = pair(image_size)
         # patch_height, patch_width = pair(patch_size)
@@ -54,25 +54,34 @@ class ViT(nn.Module):
         #     Rearrange('b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1=patch_height, p2=patch_width),
         #     nn.Linear(patch_dim, dim),
         # )
-
-        self.pos_embedding = nn.Parameter(torch.randn(1, nr_tiles+1, dim))
+        
+        if self.pos_enc:
+            self.pos_enc = pos_enc
+        else:
+            self.pos_enc = ""
+        
+        if "lAbs" in self.pos_enc: 
+            self.pos_embedding = nn.Parameter(torch.randn(1, nr_tiles+1, dim))
         
         self.input_dim = input_dim
         
-        self.omega_x = nn.Parameter(torch.arange(dim // 4) / (dim // 4 - 1))
-        self.omega_y = nn.Parameter(torch.arange(dim // 4) / (dim // 4 - 1))
+        if "l2dSin" in self.pos_enc:
+            self.omega_x = nn.Parameter(torch.arange(dim // 4) / (dim // 4 - 1))
+            self.omega_y = nn.Parameter(torch.arange(dim // 4) / (dim // 4 - 1))
         
-        self.scale = nn.Parameter(torch.randn(dim))
+        if "scale" in self.pos_enc:
+            self.scale = nn.Parameter(torch.randn(dim))
         
-        if(add_pos_feats):
+        if "posFeat" in self.pos_enc:
             self.input_dim=self.input_dim + 2     
+            
         self.fc = nn.Sequential(nn.Linear(self.input_dim, dim, bias=True), nn.ReLU())  # added by me
 
         #self.cls_token = nn.Parameter(torch.randn(1, 1, dim))
         self.cls_token = nn.Parameter(torch.randn(1, 1, dim))
         self.dropout = nn.Dropout(emb_dropout)
 
-        self.transformer = Transformer(dim, depth, heads, dim_head, mlp_dim, dropout)
+        self.transformer = Transformer(dim, depth, heads, dim_head, mlp_dim, dropout, self.pos_enc)
         #self.transformer = Transformer(self.input_dim, depth, heads, dim_head, mlp_dim, dropout)
         
         self.pool = pool
@@ -97,30 +106,36 @@ class ViT(nn.Module):
         adj_omega_x = 1. / (temperature ** omega_x)   
         y = y.view(b,-1)[:,:, None] * adj_omega_y[None, :]
         x = x.view(b,-1)[:,:, None] * adj_omega_x[None, :] 
-        pe = torch.cat((x.sin(), x.cos(), y.sin(), y.cos()), dim = 2)/10
+        pe = torch.cat((x.sin(), x.cos(), y.sin(), y.cos()), dim = 2)/5
         return pe.type(dtype)
 
     def forward(self, x, coords, register_hook=False):
         # x = self.to_patch_embedding(img)
         b, n, d = x.shape
-        #print(f"input shape: {x.shape}")
-        #pe = posemb_sincos_2d(x,coords)
-        #pe = self.learnable_sincos_2d(x,coords,self.omega_x,self.omega_y)
-        #x = x + pe
-        #pe = posemb_sincos_2d(x,coords)
-        #x = x + pe
-        #x = torch.cat((x,coords/3e+4),dim=2)
+        if "posFeat" in self.pos_enc:
+            x = torch.cat((x,coords/3e+4),dim=2)
         x = self.fc(x)
-        #pe = self.learnable_sincos_2d(x,coords,self.omega_x,self.omega_y)
         
-        #pe = self.learnable_sincos_2d(x,coords,self.omega_x,self.omega_y)
-        #x = x + pe*self.scale[:n]
+        if "l2dSin" in self.pos_enc:
+            pe = self.learnable_sincos_2d(x,coords,self.omega_x,self.omega_y)
+            if "scale" in self.pos_enc:
+                x = x + pe*self.scale[:n]
+            else:
+                x = x + pe 
+        
+        elif "2dSin" in self.pos_enc:
+            pe = posemb_sincos_2d(x,coords)
+            if "scale" in self.pos_enc:
+                x = x + pe*self.scale[:n]
+            else:
+                x = x + pe
         
         cls_tokens = repeat(self.cls_token, '1 1 d -> b 1 d', b=b)
         x = torch.cat((cls_tokens, x), dim=1)
-        #pe = self.learnable_sincos_2d(x,coords,self.omega_x,self.omega_y)
+       
+        if "lAbs" in self.pos_enc:
+            x = x + self.pos_embedding[:, :(n + 1)]
         
-        #x = x + self.pos_embedding[:, :(n + 1)]
         x = self.dropout(x)
 
         x = self.transformer(x) # , register_hook=register_hook
