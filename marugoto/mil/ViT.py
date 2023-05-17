@@ -55,7 +55,7 @@ class ViT(nn.Module):
         #     nn.Linear(patch_dim, dim),
         # )
         
-        if self.pos_enc:
+        if pos_enc:
             self.pos_enc = pos_enc
         else:
             self.pos_enc = ""
