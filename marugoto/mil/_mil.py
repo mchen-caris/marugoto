@@ -120,10 +120,11 @@ def train(
 
     #pos_feat_imp = nn.functional.softmax(learn.fc[0].weight,dim=1)[:,-2:]
     #print(f"pos feature weights: {pos_feat_imp}")
-    if "posFeat" in pos_enc:
-        feat_importances = torch.abs(learn.fc[0].weight).sum(dim=0).cpu().detach().numpy()
-        pos_feat_importances = feat_importances[-2:]/np.sum(feat_importances)*len(feat_importances)
-        print(f"pos feat importances: {pos_feat_importances}")
+    if pos_enc:
+        if "posFeat" in pos_enc:
+            feat_importances = torch.abs(learn.fc[0].weight).sum(dim=0).cpu().detach().numpy()
+            pos_feat_importances = feat_importances[-2:]/np.sum(feat_importances)*len(feat_importances)
+            print(f"pos feat importances: {pos_feat_importances}")
     #plt.bar(range(770),feat_importances)
     #plt.xlabel("Feature index")
     #plt.ylabel("Importance")
