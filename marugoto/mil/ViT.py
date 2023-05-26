@@ -39,7 +39,7 @@ class Transformer(nn.Module):
 
 class ViT(nn.Module):
     def __init__(self, *, num_classes, input_dim=768, dim=512, depth=2, heads=8, mlp_dim=512, pool='cls', channels=3,
-                 dim_head=64, dropout=0., emb_dropout=0., nr_tiles=4096, pos_enc=None):
+                 dim_head=64, dropout=0., emb_dropout=0., nr_tiles=4096, pos_enc=None, zoom=False):
         super().__init__()
         # image_height, image_width = pair(image_size)
         # patch_height, patch_width = pair(patch_size)
@@ -54,6 +54,8 @@ class ViT(nn.Module):
         #     Rearrange('b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1=patch_height, p2=patch_width),
         #     nn.Linear(patch_dim, dim),
         # )
+        
+        self.zoom = zoom
         
         if pos_enc:
             self.pos_enc = pos_enc
@@ -72,7 +74,10 @@ class ViT(nn.Module):
         if "scale" in self.pos_enc:
             self.scale = nn.Parameter(torch.randn(dim))
         
-        if "posFeat" in self.pos_enc:
+        if self.zoom:
+            self.input_dim = self.input_dim + 3
+        
+        elif "posFeat" in self.pos_enc:
             self.input_dim=self.input_dim + 2     
             
         self.fc = nn.Sequential(nn.Linear(self.input_dim, dim, bias=True), nn.ReLU())  # added by me
@@ -109,11 +114,13 @@ class ViT(nn.Module):
         pe = torch.cat((x.sin(), x.cos(), y.sin(), y.cos()), dim = 2)/5
         return pe.type(dtype)
 
-    def forward(self, x, coords, register_hook=False):
+    def forward(self, x, coords, zoom, register_hook=False):
         # x = self.to_patch_embedding(img)
         b, n, d = x.shape
-        if "posFeat" in self.pos_enc:
-            x = torch.cat((x,coords/3e+4),dim=2)
+        if "posFeat" in self.pos_enc or self.zoom:
+            x = torch.cat((x,coords/1e+4),dim=2)
+            if self.zoom:
+                x = torch.cat((x,zoom/20),dim=2)
         x = self.fc(x)
         
         if "l2dSin" in self.pos_enc:

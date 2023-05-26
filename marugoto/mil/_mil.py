@@ -47,6 +47,7 @@ def train(
     batch_size: Optional[int] = 64,
     bag_size: Optional[int] = 1024,
     pos_enc: Optional[str] = None,
+    zoom: Optional[bool] = False,
     bs_tr_only: Optional[bool] = False,
 ) -> Learner:
     """Train a MLP on image features.
@@ -92,7 +93,7 @@ def train(
     # print(f"batch[2] {batch[2]}")
     # print(f"batch[3]: {batch[3]}")
     # for binary classification num_classes=2 for same output dim as normal MILModel
-    model = ViT(num_classes=nr_classes,input_dim=num_feats,nr_tiles=bag_size,pos_enc=pos_enc) # Transformer(num_classes=2)
+    model = ViT(num_classes=nr_classes,input_dim=num_feats,nr_tiles=bag_size,pos_enc=pos_enc,zoom=zoom) # Transformer(num_classes=2)
     print(f"num_feats: {num_feats}")
     model.to(torch.device(dev if torch.cuda.is_available() else 'cpu')) #
 
@@ -122,9 +123,14 @@ def train(
     #print(f"pos feature weights: {pos_feat_imp}")
     if pos_enc:
         if "posFeat" in pos_enc:
-            feat_importances = torch.abs(learn.fc[0].weight).sum(dim=0).cpu().detach().numpy()
-            pos_feat_importances = feat_importances[-2:]/np.sum(feat_importances)*len(feat_importances)
-            print(f"pos feat importances: {pos_feat_importances}")
+            if zoom:
+                feat_importances = torch.abs(learn.fc[0].weight).sum(dim=0).cpu().detach().numpy()
+                pos_feat_importances = feat_importances[-3:]/np.sum(feat_importances)*len(feat_importances)
+                print(f"pos feat + zoom importances: {pos_feat_importances}")
+            else:
+                feat_importances = torch.abs(learn.fc[0].weight).sum(dim=0).cpu().detach().numpy()
+                pos_feat_importances = feat_importances[-2:]/np.sum(feat_importances)*len(feat_importances)
+                print(f"pos feat importances: {pos_feat_importances}")
     #plt.bar(range(770),feat_importances)
     #plt.xlabel("Feature index")
     #plt.ylabel("Importance")

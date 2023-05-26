@@ -44,6 +44,7 @@ def train_categorical_model_(
     gpu_id: Optional[int] = 0,
     seed: Optional[int] = 12345,
     pos_enc: Optional[str] = None,
+    zoom: Optional[bool] = False, 
     bs_tr_only: Optional[bool] = False,
 ) -> None:
     """Train a categorical model on a cohort's tile's features.
@@ -137,7 +138,8 @@ def train_categorical_model_(
         num_feats=num_feats,
         gpu_id=gpu_id,
         pos_enc=pos_enc,
-        bs_tr_only=bs_tr_only
+        zoom=zoom,
+        bs_tr_only=bs_tr_only,
     )
 
     # save some additional information to the learner to make deployment easier
@@ -224,6 +226,7 @@ def deploy_categorical_model_(
     target_label: Optional[str] = None,
     cat_labels: Optional[str] = None,
     cont_labels: Optional[str] = None,
+    zoom: Optional[bool] = False,
     bs_tr_only: Optional[bool] = False,
 ) -> None:
     """Deploy a categorical model on a cohort's tile's features.
@@ -285,6 +288,7 @@ def categorical_crossval_(
     num_feats: Optional[int] = 768,
     gpu_id: Optional[int] = 0,
     pos_enc: Optional[str] = None,
+    zoom: Optional[bool] = False,
     bs_tr_only: Optional[bool] = False,
 ) -> None:
     """Performs a cross-validation for a categorical target.
@@ -402,6 +406,7 @@ def categorical_crossval_(
                 num_feats = num_feats,
                 gpu_id=gpu_id,
                 pos_enc = pos_enc,
+                zoom = zoom,
                 bs_tr_only=bs_tr_only
             )
             learn.export()
@@ -422,7 +427,7 @@ def categorical_crossval_(
 
 def _crossval_train(
     *, fold_path, fold_df, fold, info, target_label, target_enc, cat_labels, cont_labels, num_feats=768, gpu_id=0,
-    pos_enc = None, bs_tr_only=False,
+    pos_enc = None, zoom=False, bs_tr_only=False,
 ):
     """Helper function for training the folds."""
     assert fold_df.PATIENT.nunique() == len(fold_df)
@@ -466,6 +471,7 @@ def _crossval_train(
         num_feats = num_feats,
         gpu_id=gpu_id,
         pos_enc = pos_enc,
+        zoom = zoom,
         bs_tr_only=bs_tr_only,
     )
     learn.target_label = target_label

@@ -41,28 +41,33 @@ class BagDataset(Dataset):
         # collect all the features
         feat_list = []
         coord_list = []
+        zoom_list = []
         for bag_file in self.bags[index]:
             with h5py.File(bag_file, "r") as f:
                 feat_list.append(torch.from_numpy(f["feats"][:]))
                 coord_list.append(torch.from_numpy(f["coords"][:]))
+                zoom_list.append(torch.from_numpy(f["zoom"][:]))
         feats = torch.concat(feat_list).float()
         coords = torch.concat(coord_list).float()
+        zoom = torch.concat(zoom_list).float()
         
         # sample a subset, if required
         if self.bag_size:
-            return _to_fixed_size_bag(feats, coords, bag_size=self.bag_size)
+            return _to_fixed_size_bag(feats, coords, zoom, bag_size=self.bag_size)
         else:
             assert len(coords)==len(feats), "Feature list length and Coordinate list length should be equal!" 
-            return feats, coords, len(feats)
+            assert len(feats)==len(zoom), "Feature list length and Zoom list length should be the equal!"
+            return feats, coords, zoom, len(feats)
 
 
 def _to_fixed_size_bag(
-    bag: torch.Tensor, coords: torch.Tensor, bag_size: int = 512
+    bag: torch.Tensor, coords: torch.Tensor, zoom: torch.Tensor, bag_size: int = 512
 ) -> Tuple[torch.Tensor, torch.Tensor, int]:
     # get up to bag_size elements
     bag_idxs = torch.sort(torch.randperm(bag.shape[0])[:bag_size])[0]
     bag_samples = bag[bag_idxs]
     coord_samples = coords[bag_idxs]
+    zoom_samples = zoom[bag_idxs]
 
     # zero-pad if we don't have enough samples
     if bag_size > bag_samples.shape[0]:
@@ -78,10 +83,16 @@ def _to_fixed_size_bag(
                 torch.zeros(bag_size - coord_samples.shape[0], coord_samples.shape[1]),
             )
         )
-        return zero_padded, zero_padded_coords, min(bag_size, len(bag))
+        zero_padded_zoom = torch.cat(
+            (
+                zoom_samples,
+                torch.zeros(bag_size - zoom_samples.shape[0], zoom_samples.shape[1]),
+            )
+        )
+        return zero_padded, zero_padded_coords, zero_padded_zoom, min(bag_size, len(bag))
 
     else:
-        return bag_samples, coord_samples, len(bag_samples)
+        return bag_samples, coord_samples, zoom_samples, len(bag_samples)
 
 
 def make_dataset(
@@ -124,10 +135,11 @@ def _make_basic_dataset(
 
 
 def zip_bag_targ(bag, targets):
-    features, coords, lengths = bag
+    features, coords, zoom, lengths = bag
     return (
         features,
         coords,
+        zoom,
         lengths,
         targets.squeeze(),
     )
@@ -179,7 +191,8 @@ def _attach_add_to_bag_and_zip_with_targ(bag, add, targ):
             dim=1,
         ),
         bag[1],
-        bag[2],  # the bag's length
+        bag[2],
+        bag[3],  # the bag's length
         targ.squeeze(),  # the ground truth
     )
 
@@ -197,13 +210,15 @@ def get_cohort_df(
         else pd.read_excel(clini_table, dtype=str)
     )
     slide_df = pd.read_csv(slide_table, dtype=str)
+    if "FILENAME" in clini_df.keys():
+        clini_df = clini_df.drop("FILENAME", axis=1)
     df = clini_df.merge(slide_df, on="PATIENT")
     assert not df.empty, "no overlap between clini and slide table."
 
     # infer categories if not given
     if categories is None:
         categories = df.dropna(subset=target_label)[target_label].unique()
-    assert len(categories) >= 2, f"fewer than two categories found: {categories=}"
+    assert len(categories) >= 2, f"fewer than two categories found: {categories}"
 
     # remove uninteresting
     df = df[df[target_label].isin(categories)]
