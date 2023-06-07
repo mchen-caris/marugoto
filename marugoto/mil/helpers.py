@@ -44,6 +44,8 @@ def train_categorical_model_(
     gpu_id: Optional[int] = 0,
     seed: Optional[int] = 12345,
     pos_enc: Optional[str] = None,
+    batch_size: Optional[int] = 64,
+    bag_size: Optional[int] = 1024,
     zoom: Optional[bool] = False, 
     bs_tr_only: Optional[bool] = False,
 ) -> None:
@@ -138,6 +140,8 @@ def train_categorical_model_(
         num_feats=num_feats,
         gpu_id=gpu_id,
         pos_enc=pos_enc,
+        batch_size=batch_size,
+        bag_size=bag_size,
         zoom=zoom,
         bs_tr_only=bs_tr_only,
     )
@@ -226,7 +230,6 @@ def deploy_categorical_model_(
     target_label: Optional[str] = None,
     cat_labels: Optional[str] = None,
     cont_labels: Optional[str] = None,
-    zoom: Optional[bool] = False,
     bs_tr_only: Optional[bool] = False,
 ) -> None:
     """Deploy a categorical model on a cohort's tile's features.
@@ -287,7 +290,10 @@ def categorical_crossval_(
     categories: Optional[Iterable[str]] = None,
     num_feats: Optional[int] = 768,
     gpu_id: Optional[int] = 0,
+    depth: Optional[int] = 2,
     pos_enc: Optional[str] = None,
+    batch_size: Optional[int] = 64,
+    bag_size: Optional[int] = 1024,
     zoom: Optional[bool] = False,
     bs_tr_only: Optional[bool] = False,
 ) -> None:
@@ -405,7 +411,10 @@ def categorical_crossval_(
                 cont_labels=cont_labels,
                 num_feats = num_feats,
                 gpu_id=gpu_id,
+                depth = depth,
                 pos_enc = pos_enc,
+                batch_size = batch_size,
+                bag_size = bag_size,
                 zoom = zoom,
                 bs_tr_only=bs_tr_only
             )
@@ -426,8 +435,8 @@ def categorical_crossval_(
 
 
 def _crossval_train(
-    *, fold_path, fold_df, fold, info, target_label, target_enc, cat_labels, cont_labels, num_feats=768, gpu_id=0,
-    pos_enc = None, zoom=False, bs_tr_only=False,
+    *, fold_path, fold_df, fold, info, target_label, target_enc, cat_labels, cont_labels, depth=2, num_feats=768, gpu_id=0,
+    pos_enc = None, bag_size=1024, batch_size=64, zoom=False, bs_tr_only=False,
 ):
     """Helper function for training the folds."""
     assert fold_df.PATIENT.nunique() == len(fold_df)
@@ -470,6 +479,9 @@ def _crossval_train(
         path=fold_path,
         num_feats = num_feats,
         gpu_id=gpu_id,
+        depth = depth,
+        bag_size=bag_size,
+        batch_size=batch_size,
         pos_enc = pos_enc,
         zoom = zoom,
         bs_tr_only=bs_tr_only,

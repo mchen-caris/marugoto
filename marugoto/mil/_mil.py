@@ -44,6 +44,7 @@ def train(
     path: Optional[Path] = None,
     num_feats: Optional[Path] = 768,
     gpu_id: Optional[Path] = 1,
+    depth: Optional[int] = 2,
     batch_size: Optional[int] = 64,
     bag_size: Optional[int] = 1024,
     pos_enc: Optional[str] = None,
@@ -77,7 +78,7 @@ def train(
 
     # build dataloaders
     train_dl = DataLoader(
-        train_ds, batch_size=batch_size, shuffle=True, num_workers=24, drop_last=True
+        train_ds, batch_size=batch_size if bag_size!=None and bag_size!="None" else 1, shuffle=True, num_workers=24, drop_last=True
     )
     valid_dl = DataLoader(
         #valid_ds, batch_size=batch_size, shuffle=False, num_workers=24,
@@ -85,6 +86,7 @@ def train(
     )
     batch = valid_dl.one_batch()
     nr_classes = batch[-1].shape[-1]
+    print(f"bag size: {bag_size}, type: {type(bag_size)}")
     print(f"number of classes: {nr_classes}")
     # print(f"batch length: {len(batch)}")
     # print(f"batch[0] shape: {batch[0].shape}")
@@ -93,8 +95,11 @@ def train(
     # print(f"batch[2] {batch[2]}")
     # print(f"batch[3]: {batch[3]}")
     # for binary classification num_classes=2 for same output dim as normal MILModel
-    model = ViT(num_classes=nr_classes,input_dim=num_feats,nr_tiles=bag_size,pos_enc=pos_enc,zoom=zoom) # Transformer(num_classes=2)
-    print(f"num_feats: {num_feats}")
+    model = ViT(num_classes=nr_classes,depth=depth,input_dim=num_feats,nr_tiles=bag_size,pos_enc=pos_enc,zoom=zoom) # Transformer(num_classes=2)
+    if zoom:
+        print(f"num_feats: {num_feats+3}")
+    else:
+        print(f"num_feats: {num_feats}")
     model.to(torch.device(dev if torch.cuda.is_available() else 'cpu')) #
 
     # weigh inversely to class occurances
@@ -121,16 +126,16 @@ def train(
 
     #pos_feat_imp = nn.functional.softmax(learn.fc[0].weight,dim=1)[:,-2:]
     #print(f"pos feature weights: {pos_feat_imp}")
-    if pos_enc:
-        if "posFeat" in pos_enc:
-            if zoom:
-                feat_importances = torch.abs(learn.fc[0].weight).sum(dim=0).cpu().detach().numpy()
-                pos_feat_importances = feat_importances[-3:]/np.sum(feat_importances)*len(feat_importances)
-                print(f"pos feat + zoom importances: {pos_feat_importances}")
-            else:
-                feat_importances = torch.abs(learn.fc[0].weight).sum(dim=0).cpu().detach().numpy()
-                pos_feat_importances = feat_importances[-2:]/np.sum(feat_importances)*len(feat_importances)
-                print(f"pos feat importances: {pos_feat_importances}")
+    # if pos_enc or zoom:
+    #     if "posFeat" in pos_enc or zoom:
+    #         if zoom:
+    #             feat_importances = torch.abs(learn.fc[0].weight).sum(dim=0).cpu().detach().numpy()
+    #             pos_feat_importances = feat_importances[-3:]/np.sum(feat_importances)*len(feat_importances)
+    #             print(f"pos feat + zoom importances: {pos_feat_importances}")
+    #         else:
+    #             feat_importances = torch.abs(learn.fc[0].weight).sum(dim=0).cpu().detach().numpy()
+    #             pos_feat_importances = feat_importances[-2:]/np.sum(feat_importances)*len(feat_importances)
+    #             print(f"pos feat importances: {pos_feat_importances}")
     #plt.bar(range(770),feat_importances)
     #plt.xlabel("Feature index")
     #plt.ylabel("Importance")

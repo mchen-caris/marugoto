@@ -37,7 +37,7 @@ class BagDataset(Dataset):
     def __len__(self):
         return len(self.bags)
 
-    def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor, int]:
+    def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, int]:
         # collect all the features
         feat_list = []
         coord_list = []
@@ -46,7 +46,7 @@ class BagDataset(Dataset):
             with h5py.File(bag_file, "r") as f:
                 feat_list.append(torch.from_numpy(f["feats"][:]))
                 coord_list.append(torch.from_numpy(f["coords"][:]))
-                zoom_list.append(torch.from_numpy(f["zoom"][:]))
+                zoom_list.append(torch.from_numpy(f["zoom"][:])) if "zoom" in f.keys() else zoom_list.append(torch.from_numpy(np.repeat(1,len(f["feats"][:]))))
         feats = torch.concat(feat_list).float()
         coords = torch.concat(coord_list).float()
         zoom = torch.concat(zoom_list).float()
@@ -62,9 +62,9 @@ class BagDataset(Dataset):
 
 def _to_fixed_size_bag(
     bag: torch.Tensor, coords: torch.Tensor, zoom: torch.Tensor, bag_size: int = 512
-) -> Tuple[torch.Tensor, torch.Tensor, int]:
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, int]:
     # get up to bag_size elements
-    bag_idxs = torch.sort(torch.randperm(bag.shape[0])[:bag_size])[0]
+    bag_idxs = torch.randperm(bag.shape[0])[:bag_size]
     bag_samples = bag[bag_idxs]
     coord_samples = coords[bag_idxs]
     zoom_samples = zoom[bag_idxs]
@@ -86,7 +86,7 @@ def _to_fixed_size_bag(
         zero_padded_zoom = torch.cat(
             (
                 zoom_samples,
-                torch.zeros(bag_size - zoom_samples.shape[0], zoom_samples.shape[1]),
+                torch.zeros(bag_size - zoom_samples.shape[0]),
             )
         )
         return zero_padded, zero_padded_coords, zero_padded_zoom, min(bag_size, len(bag))

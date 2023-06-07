@@ -62,10 +62,21 @@ class ViT(nn.Module):
         else:
             self.pos_enc = ""
         
+        self.input_dim = input_dim
+         
+        if self.zoom:
+            self.input_dim += 3
+        
+        elif "posFeat" in self.pos_enc:
+            self.input_dim=self.input_dim + 2 
+        
+        dim = self.input_dim
+        
+        
+        
         if "lAbs" in self.pos_enc: 
             self.pos_embedding = nn.Parameter(torch.randn(1, nr_tiles+1, dim))
         
-        self.input_dim = input_dim
         
         if "l2dSin" in self.pos_enc:
             self.omega_x = nn.Parameter(torch.arange(dim // 4) / (dim // 4 - 1))
@@ -74,13 +85,12 @@ class ViT(nn.Module):
         if "scale" in self.pos_enc:
             self.scale = nn.Parameter(torch.randn(dim))
         
-        if self.zoom:
-            self.input_dim = self.input_dim + 3
+        #if self.zoom:
+        #    self.input_dim = self.input_dim + 3
         
-        elif "posFeat" in self.pos_enc:
-            self.input_dim=self.input_dim + 2     
             
-        self.fc = nn.Sequential(nn.Linear(self.input_dim, dim, bias=True), nn.ReLU())  # added by me
+            
+        #self.fc = nn.Sequential(nn.Linear(self.input_dim, dim, bias=True), nn.ReLU())  # added by me
 
         #self.cls_token = nn.Parameter(torch.randn(1, 1, dim))
         self.cls_token = nn.Parameter(torch.randn(1, 1, dim))
@@ -120,8 +130,8 @@ class ViT(nn.Module):
         if "posFeat" in self.pos_enc or self.zoom:
             x = torch.cat((x,coords/1e+4),dim=2)
             if self.zoom:
-                x = torch.cat((x,zoom/20),dim=2)
-        x = self.fc(x)
+                x = torch.cat((x,zoom[:,:,None]/10),dim=2)
+        #x = self.fc(x)
         
         if "l2dSin" in self.pos_enc:
             pe = self.learnable_sincos_2d(x,coords,self.omega_x,self.omega_y)

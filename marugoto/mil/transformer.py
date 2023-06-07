@@ -121,8 +121,9 @@ class Transformer(nn.Module):
         self.n_classes = num_classes
 
         self._fc1 = nn.Sequential(nn.Linear(2048, 512, bias=True), nn.ReLU())
-        self.layer1 = TransformerLayer(dim=512, heads=8, use_ff=False, use_norm=True)
+        self.layer1 = TransformerLayer(dim=512, heads=8, use_ff=True, use_norm=True)
         self.layer2 = TransformerLayer(dim=512, heads=8, use_ff=False, use_norm=True)
+        #self.layer3 = TransformerLayer(dim=512, heads=8, use_ff=False, use_norm=True)
         self._fc2 = nn.Linear(512, self.n_classes, bias=True)
 
     def forward(self, x,_):
@@ -131,6 +132,7 @@ class Transformer(nn.Module):
         h = self._fc1(h)
         h = self.layer1(h)
         h = self.layer2(h)
+        #h = self.layer3(h)
         h = h.mean(dim=1)
         logits = self._fc2(h)
 
